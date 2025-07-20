@@ -1,0 +1,53 @@
+version: "2"
+run:
+  concurrency: 10
+  tests: true
+linters:
+  default: all
+  disable:
+    - arangolint
+    - funlen
+    - ginkgolinter
+    - gochecknoglobals
+    - godot
+    - godox
+    - ireturn # Allow returning interfaces
+    - maintidx
+    - misspell
+    - promlinter
+    - wsl # new major
+    - depguard # very interesting and useful but not used here
+    - exhaustruct
+    - cyclop
+    - gochecknoinits
+    - gocognit
+    - gocyclo
+    - nestif
+    - wsl_v5
+    - unparam
+    - err113
+
+formatters:
+  settings:
+    gofmt:
+      # Simplify code: gofmt with `-s` option.
+      # Default: true
+      simplify: false
+      # Apply the rewrite rules to the source before reformatting.
+      # https://pkg.go.dev/cmd/gofmt
+      # Default: []
+      rewrite-rules:
+        - pattern: 'interface{}'
+          replacement: 'any'
+        - pattern: 'a[b:len(a)]'
+          replacement: 'a[b:]'
+    golines:
+      max-len: 200
+      tab-len: 4
+      # Shorten single-line comments.
+      # Default: false
+      shorten-comments: true
+      # Default: true
+      reformat-tags: true
+      # Split chained methods on the dots as opposed to the arguments.
+      chain-split-dots: true
