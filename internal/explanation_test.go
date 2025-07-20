@@ -158,7 +158,7 @@ WARN_002 happened`,
 			var outputBuffer bytes.Buffer
 
 			// Call the function
-			err := internal.FindAndPrintMatches(testCase.content, testCase.explanations, &outputBuffer)
+			err := internal.FindAndPrintMatches(strings.NewReader(testCase.content), testCase.explanations, &outputBuffer)
 			require.NoError(t, err)
 
 			actualOutput := outputBuffer.String()

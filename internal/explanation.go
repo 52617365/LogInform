@@ -93,9 +93,9 @@ func formatContentLine(line string, identifier string, maxLen int) string {
 	return result
 }
 
-// FindAndPrintMatches processes a string content line by line and prints lines containing any identifier
+// FindAndPrintMatches processes content from an io.Reader line by line and prints lines containing any identifier
 // from the provided slice of [Explanation] structs to the given writer.
-func FindAndPrintMatches(content string, explanations []Explanation, writer io.Writer) error {
+func FindAndPrintMatches(reader io.Reader, explanations []Explanation, writer io.Writer) error {
 	if len(explanations) == 0 {
 		return nil
 	}
@@ -110,7 +110,7 @@ func FindAndPrintMatches(content string, explanations []Explanation, writer io.W
 	}
 	
 	var matches []match
-	scanner := bufio.NewScanner(strings.NewReader(content))
+	scanner := bufio.NewScanner(reader)
 	lineNumber := 0
 	
 	for scanner.Scan() {
