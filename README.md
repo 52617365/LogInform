@@ -167,4 +167,4 @@ The application loads explanations once at startup and reuses them across all co
 
 ## License
 
-[Add your license information here]
+Apache 2.0
