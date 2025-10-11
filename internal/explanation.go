@@ -41,6 +41,7 @@ func fetchExplanationsFromRemoteVcs() io.Reader {
 			githubToken := os.Getenv("GITHUB_TOKEN")
 			if githubToken == "" {
 				slog.Error("remote is private but GITHUB_TOKEN not set")
+				return nil
 			}
 			// Github uses Authorization Bearer <token>
 			req.Header.Set("Authorization", "Bearer "+githubToken)
@@ -50,9 +51,10 @@ func fetchExplanationsFromRemoteVcs() io.Reader {
 			gitlabToken := os.Getenv("GITLAB_TOKEN")
 			if gitlabToken == "" {
 				slog.Error("remote is private but GITLAB_TOKEN not set")
+				return nil
 			}
 
-			// Gitlab uses PRIVATE-TOKEN <token>
+			// Gitlab uses PRIVATE-TOKEN <token> private tokens
 			req.Header.Set("PRIVATE-TOKEN", gitlabToken)
 		}
 	}

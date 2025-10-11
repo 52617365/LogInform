@@ -10,8 +10,8 @@ explanationLocation: github
 #   - GitLab: https://gitlab.com/username/repo/-/blob/main/explanations.md
 #explanationPath: ./explanations.yml
 #explanationPath: "https://api.github.com/repos/52617365/LogInform/contents/explanations.yml"
-explanationPath: "https://gitlab.com/api/v4/projects/testing2530941%2Ftesting/repository/files/explanations.yml?ref=main"
+explanationPath: "https://api.github.com/repos/52617365/testing_remote/contents/explanations.yml"
 
 # PrivateRemote: Set to true if accessing a private GitHub/GitLab repository
 # Requires GITHUB_TOKEN or GITLAB_TOKEN environment variable to be set
-privateRemote: false
+privateRemote: true
