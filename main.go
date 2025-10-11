@@ -22,6 +22,7 @@ var rootCmd = &cobra.Command{
 			return fmt.Errorf("error reading explanations.yml")
 		}
 		defer f.Close()
+		// TODO: support reading this from remote file like version control or something.
 		tmpExplanations, err := internal.LoadExplanationsFromReader(f)
 		if err != nil {
 			return err
@@ -36,20 +37,20 @@ var explainCmd = &cobra.Command{
 	Short: "Find and print lines containing identifiers with explanations",
 	Long:  "Find and print lines containing identifiers with explanations from the loaded explanations file.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		inline, _ := cmd.Flags().GetBool("inline")
+		stdin, _ := cmd.Flags().GetBool("stdin")
 
-		if inline {
+		if stdin {
 			content := strings.Join(args, " ")
 			return internal.FindAndPrintMatches(strings.NewReader(content), explanations, os.Stdout)
 		}
 
-		if len(args) == 0 {
-			return fmt.Errorf("please provide a file path or use --inline flag")
+		if len(args) == 0 && !stdin {
+			return fmt.Errorf("please provide a file path or use --stdin flag")
 		}
 
 		if _, err := os.Stat(args[0]); err != nil {
 			if os.IsNotExist(err) {
-				return fmt.Errorf("file does not exist: %s\nDid you mean to use --inline to pass content directly?\n", args[0])
+				return fmt.Errorf("file does not exist: %s\nDid you mean to use --stdin to pass content directly?", args[0])
 			}
 			return fmt.Errorf("error checking file: %w", err)
 		}
