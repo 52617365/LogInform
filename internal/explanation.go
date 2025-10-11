@@ -6,22 +6,75 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
+	"net/http"
+	"os"
 	"strings"
 	"unicode/utf8"
 
+	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 )
 
-// Explanation represents a log explanation with identifier and description text.
-type Explanation struct {
-	Identifier          string `yaml:"identifier"`
-	InternetExplanation string `yaml:"internetExplanation"`
-	InternalExplanation string `yaml:"internalExplanation"`
+type Configuration struct {
+	ExplanationLocation string // file, github or gitlab
+	// TODO: SFTP support
+	ExplanationPath string // Local path or GitHub/Gitlab link
+	PrivateRemote   bool   // If this is true then we will expect that GITLAB_TOKEN or GITHUB_TOKEN is set.
 }
 
-// LoadExplanationsFromReader reads YAML content from an io.Reader and returns a slice of [Explanation] structs.
+func fetchExplanationsFromRemoteVcs() io.Reader {
+	var requestOptions *http.Request
+	if viper.GetString("ExplanationLocation") == "file" {
+		panic("should not come to this func")
+	}
+
+	req, err := http.NewRequest("GET", viper.GetString("ExplanationPath"), nil)
+	if err != nil {
+		slog.Error("there was an error constructing a request", viper.Get("ExplanationLocation"), viper.GetString("ExplanationPath"))
+	}
+
+	if viper.GetString("ExplanationLocation") == "github" {
+		if viper.GetBool("PrivateRemote") {
+			githubToken := os.Getenv("GITHUB_TOKEN")
+			if githubToken == "" {
+				slog.Error("remote is private but GITHUB_TOKEN not set")
+			}
+			// Github uses Authorization Bearer <token>
+			req.Header.Set("Authorization", "Bearer "+githubToken)
+		}
+	} else if viper.GetString("ExplanationLocation") == "gitlab" {
+		if viper.GetBool("PrivateRemote") {
+			gitlabToken := os.Getenv("GITLAB_TOKEN")
+			if gitlabToken == "" {
+				slog.Error("remote is private but GITLAB_TOKEN not set")
+			}
+
+			// Gitlab uses PRIVATE-TOKEN <token>
+			req.Header.Set("PRIVATE-TOKEN", gitlabToken)
+		}
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(requestOptions)
+	if err != nil {
+		slog.Error("error fetching explanations from remote", "remote", viper.Get("ExplanationLocation"), "private", viper.Get("PrivateRemote"), "path", viper.Get("ExplanationPath"))
+		return nil
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		slog.Error("got non ok error code when fetching explanations from remote", "remote", viper.Get("ExplanationLocation"), "private", viper.Get("PrivateRemote"), "path", viper.Get("ExplanationPath"), "code", resp.StatusCode)
+		return nil
+	}
+
+	return resp.Body
+}
+
+// loadExplanationsFromReader reads YAML content from an io.Reader and returns a slice of [Explanation] structs.
 // It uses streaming YAML parsing to avoid loading the entire content into memory at once.
-func LoadExplanationsFromReader(reader io.Reader) ([]Explanation, error) {
+func loadExplanationsFromReader(reader io.Reader) ([]Explanation, error) {
 	var explanations []Explanation
 
 	decoder := yaml.NewDecoder(reader)
@@ -31,6 +84,40 @@ func LoadExplanationsFromReader(reader io.Reader) ([]Explanation, error) {
 	}
 
 	return explanations, nil
+}
+
+func FetchExplanations() []Explanation {
+	// populated from local file, github or gitlab depending on configuration
+	var dataReader io.Reader
+
+	if viper.GetString("ExplanationPath") == "" {
+		panic("catch in validation")
+	}
+	if viper.Get("ExplanationLocation") == "file" {
+		file, err := os.Open(viper.GetString("ExplanationPath"))
+		if err != nil {
+			slog.Error("error reading local explanations file", "explanation_location", viper.GetString("ExplanationLocation"), "path", viper.Get("ExplanationPath"), "private", viper.Get("PrivateRemote"))
+		}
+		dataReader = file
+	} else if viper.Get("ExplanationLocation") == "github" || viper.Get("ExplanationLocation") == "gitlab" {
+		dataReader = fetchExplanationsFromRemoteVcs()
+	} else {
+		slog.Error("FetchExplanations was called with ExplanationLocation that is not handled in function", "explanation_location", viper.GetString("ExplanationLocation"), "path", viper.Get("ExplanationPath"), "private", viper.Get("PrivateRemote"))
+	}
+
+	explanations, err := loadExplanationsFromReader(dataReader)
+	if err != nil {
+		slog.Error("the explanations format received from location is is an invalid format", "explanation_location", viper.GetString("ExplanationLocation"), "path", viper.Get("ExplanationPath"), "private", viper.Get("PrivateRemote"))
+	}
+
+	return explanations
+}
+
+// Explanation represents a log explanation with identifier and description text.
+type Explanation struct {
+	Identifier          string `yaml:"identifier"`
+	InternetExplanation string `yaml:"internetExplanation"`
+	InternalExplanation string `yaml:"internalExplanation"`
 }
 
 // formatContentLine truncates very long lines and shows context around the identifier

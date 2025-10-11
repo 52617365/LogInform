@@ -2,12 +2,15 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 
 	"github.com/52617365/LogInform/internal"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var explanations []internal.Explanation
@@ -17,16 +20,19 @@ var rootCmd = &cobra.Command{
 	Short: "LogInform - A tool for finding and explaining log identifiers",
 	Long:  "LogInform helps you find and explain log identifiers in your content using predefined explanations.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		f, err := os.Open("explanations.yml")
-		if err != nil {
-			return fmt.Errorf("error reading explanations.yml")
+		var fileLookupError viper.ConfigFileNotFoundError
+		if err := viper.ReadInConfig(); err != nil {
+			if errors.As(err, &fileLookupError) {
+				slog.Error("couldn't find a configuration file. looked in current path and user root.")
+				// Indicates an explicitly set config file is not found (such as with
+				// using `viper.SetConfigFile`) or that no config file was found in
+				// any search path (such as when using `viper.AddConfigPath`)
+			} else {
+				slog.Error("found configuration file but the structure was invalid.", "config", viper.ConfigFileUsed())
+				// Config file was found but another error was produced
+			}
 		}
-		defer f.Close()
-		// TODO: support reading this from remote file like version control or something.
-		tmpExplanations, err := internal.LoadExplanationsFromReader(f)
-		if err != nil {
-			return err
-		}
+		tmpExplanations := internal.FetchExplanations()
 		explanations = tmpExplanations
 		return nil
 	},
@@ -76,13 +82,17 @@ var inspectCmd = &cobra.Command{
 
 func init() {
 	explainCmd.Flags().Bool("inline", false, "Pass content directly as arguments instead of reading from file")
+
+	viper.AddConfigPath("/etc/.explanations/")
+	viper.AddConfigPath("$HOME/.explanations")
+	viper.AddConfigPath(".")
+	viper.SetConfigType("yaml")
+	viper.SetConfigName("config")
+
 	rootCmd.AddCommand(explainCmd)
 	rootCmd.AddCommand(inspectCmd)
 }
 
 func main() {
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
+	rootCmd.Execute()
 }
