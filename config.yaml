@@ -1,14 +1,17 @@
 # Configuration file
 # ExplanationLocation: Defines where explanations are stored (file, github, or gitlab)
-explanationLocation: file
+#explanationLocation: file
+explanationLocation: github
 
 # ExplanationPath: Local file path or GitHub/GitLab repository URL
 # Examples:
 #   - Local: ./explanations/readme.md
 #   - GitHub: https://github.com/username/repo/blob/main/explanations.md
 #   - GitLab: https://gitlab.com/username/repo/-/blob/main/explanations.md
-explanationPath: ./explanations.yml
+#explanationPath: ./explanations.yml
+#explanationPath: "https://api.github.com/repos/52617365/LogInform/contents/explanations.yml"
+explanationPath: "https://gitlab.com/api/v4/projects/testing2530941%2Ftesting/repository/files/explanations.yml?ref=main"
 
 # PrivateRemote: Set to true if accessing a private GitHub/GitLab repository
 # Requires GITHUB_TOKEN or GITLAB_TOKEN environment variable to be set
-privateRemote: true
+privateRemote: false

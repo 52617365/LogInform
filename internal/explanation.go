@@ -3,6 +3,9 @@ package internal
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -24,14 +27,13 @@ type Configuration struct {
 }
 
 func fetchExplanationsFromRemoteVcs() io.Reader {
-	var requestOptions *http.Request
 	if viper.GetString("ExplanationLocation") == "file" {
 		panic("should not come to this func")
 	}
 
 	req, err := http.NewRequest("GET", viper.GetString("ExplanationPath"), nil)
 	if err != nil {
-		slog.Error("there was an error constructing a request", viper.Get("ExplanationLocation"), viper.GetString("ExplanationPath"))
+		slog.Error("there was an error constructing a request", "err", err, viper.Get("ExplanationLocation"), viper.GetString("ExplanationPath"))
 	}
 
 	if viper.GetString("ExplanationLocation") == "github" {
@@ -56,20 +58,39 @@ func fetchExplanationsFromRemoteVcs() io.Reader {
 	}
 
 	client := &http.Client{}
-	resp, err := client.Do(requestOptions)
+	resp, err := client.Do(req)
 	if err != nil {
-		slog.Error("error fetching explanations from remote", "remote", viper.Get("ExplanationLocation"), "private", viper.Get("PrivateRemote"), "path", viper.Get("ExplanationPath"))
+		slog.Error("error fetching explanations from remote", "err", err, "remote", viper.Get("ExplanationLocation"), "private", viper.Get("PrivateRemote"), "path", viper.Get("ExplanationPath"))
 		return nil
 	}
-
-	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		slog.Error("got non ok error code when fetching explanations from remote", "remote", viper.Get("ExplanationLocation"), "private", viper.Get("PrivateRemote"), "path", viper.Get("ExplanationPath"), "code", resp.StatusCode)
+		slog.Error("got non ok error code when fetching explanations from remote", "err", err, "remote", viper.Get("ExplanationLocation"), "private", viper.Get("PrivateRemote"), "path", viper.Get("ExplanationPath"), "code", resp.StatusCode)
 		return nil
 	}
 
-	return resp.Body
+	// resp.body is base64 encoded, decode first
+
+	bodyContents, err := io.ReadAll(resp.Body)
+	if err != nil {
+		slog.Error("error reading response from remote rest api call", "err", err, "remote", viper.Get("ExplanationLocation"), "private", viper.Get("PrivateRemote"), "path", viper.Get("ExplanationPath"), "code", resp.StatusCode)
+	}
+
+	var contents struct {
+		Content string `json:"content"`
+	}
+
+	if err := json.Unmarshal(bodyContents, &contents); err != nil {
+		slog.Error("error unmarshaling JSON response", "error", err)
+		return nil
+	}
+
+	// The actual data is in the content JSON key
+	data, err := base64.StdEncoding.DecodeString(contents.Content)
+	if err != nil {
+		slog.Error("error decoding response", "err", err, "remote", viper.Get("ExplanationLocation"), "private", viper.Get("PrivateRemote"), "path", viper.Get("ExplanationPath"), "code", resp.StatusCode)
+	}
+	return bytes.NewReader(data)
 }
 
 // loadExplanationsFromReader reads YAML content from an io.Reader and returns a slice of [Explanation] structs.
@@ -107,7 +128,7 @@ func FetchExplanations() []Explanation {
 
 	explanations, err := loadExplanationsFromReader(dataReader)
 	if err != nil {
-		slog.Error("the explanations format received from location is is an invalid format", "explanation_location", viper.GetString("ExplanationLocation"), "path", viper.Get("ExplanationPath"), "private", viper.Get("PrivateRemote"))
+		slog.Error("the explanations format received from location is in an invalid format", "explanation_location", viper.GetString("ExplanationLocation"), "path", viper.Get("ExplanationPath"), "private", viper.Get("PrivateRemote"))
 	}
 
 	return explanations
